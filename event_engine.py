@@ -3,9 +3,8 @@ import heapq
 
 class Event:
 
-    def __init__(self, time, func):
+    def __init__(self, time):
         self.time = -time  # Python heap returns the lowest value
-        self.func = func
 
     def __eq__(self, other):
         return self.time == other.time
