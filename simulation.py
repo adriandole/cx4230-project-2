@@ -36,6 +36,20 @@ def get_travel_time(section: int, time: str) -> float:
         raise ValueError('Time must be AM or PM')
 
 
+class Arrival(Event):
+
+    def __init__(self, time, section):
+        super().__init__(time)
+        self.section = section
+
+
+class Departure(Event):
+
+    def __init__(self, time, section):
+        super().__init__(time)
+        self.section = section
+
+
 class TrafficSimulation:
 
     def __init__(self):
