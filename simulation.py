@@ -38,15 +38,36 @@ def get_travel_time(section: int, time: str) -> float:
 
 class TrafficEvent(Event):
 
-    def __init__(self, base, time, section):
+    def __init__(self, base: TrafficSimulation, time, section):
         super().__init__(time)
         self.base = base  # reference to the base simulation class, allowing the event to handle itself
         self.section = section
 
 
+class Departure(TrafficEvent):
+
+    def handle(self):
+        pass
+
+
+class Arrival(TrafficEvent):
+
+    def handle(self):
+        if self.section == 0:
+            next_arrival_time = np.random.normal(self.base.inter_arrival_mu, self.base.inter_arrival_sigma) + self.time
+            next_arrival = Arrival(self.base, next_arrival_time, self.section + 1)
+            self.base.engine.queue_event(next_arrival)
+        if self.section < 2:
+            travel_time = get_travel_time(self.section, self.base.am_pm) + self.time
+            departure = Departure(self.base, travel_time, self.section)
+
+
 class TrafficSimulation:
 
-    def __init__(self):
+    def __init__(self, inter_arrival_mu, inter_arrival_sigma):
         self.engine = EventEngine()
+        self.inter_arrival_mu = inter_arrival_mu  # all parameters will be in a config file later
+        self.inter_arrival_sigma = inter_arrival_sigma
+        self.am_pm = 'AM'
 
     def run_simulation(self, sim_time: int):
