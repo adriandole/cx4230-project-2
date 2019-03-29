@@ -4,6 +4,13 @@ from event_engine import EventEngine, Event
 
 
 def generate_bimodal(mu: List[float], sigma: List[float], p: float):
+    """
+    Sample from a mixture of two normal distribution
+    :param mu: [mean of first dist., mean of second dist.]
+    :param sigma: [st. dev. of first dist., st. dev. of second dist]
+    :param p: probability of sampling from the first list
+    :return: sample value
+    """
     if np.random.uniform() < p:
         return np.random.normal(mu[0], sigma[0])
     else:
@@ -38,7 +45,7 @@ def get_travel_time(section: int, time: str) -> float:
 
 class TrafficEvent(Event):
 
-    def __init__(self, base: TrafficSimulation, time, section):
+    def __init__(self, base, time, section):
         super().__init__(time)
         self.base = base  # reference to the base simulation class, allowing the event to handle itself
         self.section = section
@@ -51,18 +58,22 @@ class Departure(TrafficEvent):
             next_arrival = Arrival(self.base, self.time, self.section + 1)
             self.base.engine.queue_event(next_arrival)
 
+        self.base.section_occupancy[self.section] -= 1
+
 
 class Arrival(TrafficEvent):
 
     def handle(self):
         if self.section == 0:
             next_arrival_time = np.random.normal(self.base.inter_arrival_mu, self.base.inter_arrival_sigma) + self.time
-            next_arrival = Arrival(self.base, next_arrival_time, self.section + 1)
+            next_arrival = Arrival(self.base, next_arrival_time, self.section)
             self.base.engine.queue_event(next_arrival)
-        if self.section < 2:
-            travel_time = get_travel_time(self.section, self.base.am_pm) + self.time
-            departure = Departure(self.base, travel_time, self.section)
-            self.base.engine.queue_event(departure)
+
+        travel_time = get_travel_time(self.section, self.base.am_pm) + self.time
+        departure = Departure(self.base, travel_time, self.section)
+        self.base.engine.queue_event(departure)
+
+        self.base.section_occupancy[self.section] += 1
 
 
 class TrafficSimulation:
@@ -72,5 +83,19 @@ class TrafficSimulation:
         self.inter_arrival_mu = inter_arrival_mu  # all parameters will be in a config file later
         self.inter_arrival_sigma = inter_arrival_sigma
         self.am_pm = 'AM'
+        self.section_occupancy = [0, 0, 0]
 
     def run_simulation(self, sim_time: int):
+        time = 0
+        self.engine.queue_event(Arrival(self, time, 0))
+        while time <= sim_time:
+            e = self.engine.get_next_event()
+            time = e.time
+            e.handle()
+
+            print(self.section_occupancy, type(e).__name__, time)
+
+
+if __name__ == '__main__':
+    t = TrafficSimulation(2, 1)
+    t.run_simulation(10000)
