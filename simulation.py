@@ -31,7 +31,7 @@ def get_travel_time(section: int, time: str) -> float:
     if time == 'AM':
         return generate_bimodal(mu_am[section], sigma_am[section], p_am[section])
     elif time == 'PM':
-        return generate_bimodal(mu_pm[section], sigma_am[section], p_am[section])
+        return generate_bimodal(mu_pm[section], sigma_pm[section], p_pm[section])
     else:
         raise ValueError('Time must be AM or PM')
 
@@ -47,7 +47,9 @@ class TrafficEvent(Event):
 class Departure(TrafficEvent):
 
     def handle(self):
-        pass
+        if self.section < 2:
+            next_arrival = Arrival(self.base, self.time, self.section + 1)
+            self.base.engine.queue_event(next_arrival)
 
 
 class Arrival(TrafficEvent):
@@ -60,6 +62,7 @@ class Arrival(TrafficEvent):
         if self.section < 2:
             travel_time = get_travel_time(self.section, self.base.am_pm) + self.time
             departure = Departure(self.base, travel_time, self.section)
+            self.base.engine.queue_event(departure)
 
 
 class TrafficSimulation:
