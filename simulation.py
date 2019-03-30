@@ -59,6 +59,8 @@ class Departure(TrafficEvent):
             self.base.engine.queue_event(next_arrival)
 
         self.base.section_occupancy[self.section] -= 1
+        self.base.section_data = np.append(self.base.section_data,
+                                           np.array([self.time] + self.base.section_occupancy).reshape((1, 4)), axis=0)
 
 
 class Arrival(TrafficEvent):
@@ -84,6 +86,7 @@ class TrafficSimulation:
         self.inter_arrival_sigma = inter_arrival_sigma
         self.am_pm = 'AM'
         self.section_occupancy = [0, 0, 0]
+        self.section_data = np.empty((0, 4))
 
     def run_simulation(self, sim_time: int):
         time = 0
@@ -99,3 +102,4 @@ class TrafficSimulation:
 if __name__ == '__main__':
     t = TrafficSimulation(2, 1)
     t.run_simulation(10000)
+    print(t.section_data)
