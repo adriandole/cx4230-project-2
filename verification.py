@@ -15,7 +15,7 @@ class TestFEL(unittest.TestCase):
         min_time = 0
         for n in range(100):
             event_time = heap.get_next_event().time
-            assert(event_time >= min_time)
+            self.assertTrue(event_time >= min_time)
             min_time = event_time
 
 

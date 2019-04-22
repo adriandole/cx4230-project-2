@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List
+from queue import Queue
 from event_engine import EventEngine, Event
 
 
@@ -22,7 +23,7 @@ def get_light_status(section, time) -> float:
 
 def get_red_wait(n_waiting) -> float:
     # TODO: find approximation for wait time as a function of number in front
-    return n_waiting
+    return n_waiting * 2
 
 
 def generate_bimodal(mu: List[float], sigma: List[float], p: float):
@@ -85,6 +86,9 @@ class Departure(TrafficEvent):
         if self.section < 2:
             next_arrival = Arrival(self.base, self.time + delay, self.section + 1)
             self.base.engine.queue_event(next_arrival)
+        elif self.section == 2:
+            arrival_time = self.base.arrivals.get()
+            self.base.travel_times.append(self.time - arrival_time)
 
         self.base.section_occupancy[self.section] -= 1
         self.base.section_data = np.append(self.base.section_data,
@@ -98,6 +102,10 @@ class Arrival(TrafficEvent):
             next_arrival_time = np.random.normal(self.base.inter_arrival_mu, self.base.inter_arrival_sigma) + self.time
             next_arrival = Arrival(self.base, next_arrival_time, self.section)
             self.base.engine.queue_event(next_arrival)
+            self.base.arrivals.put(next_arrival_time)
+
+        if self.section >= 1:
+            self.base.section_queueing[self.section - 1] -= 1
 
         travel_time = get_travel_time(self.section, self.base.am_pm) + self.time
         departure = Departure(self.base, travel_time, self.section)
@@ -113,13 +121,18 @@ class TrafficSimulation:
         self.inter_arrival_mu = inter_arrival_mu  # all parameters will be in a config file later
         self.inter_arrival_sigma = inter_arrival_sigma
         self.am_pm = 'AM'
+
         self.section_occupancy = [0, 0, 0]
         self.section_queueing = [0, 0, 0, 0]
         self.section_data = np.empty((0, 4))
 
+        self.arrivals = Queue()
+        self.travel_times = []
+
     def run_simulation(self, sim_time: int):
         time = 0
         self.engine.queue_event(Arrival(self, time, 0))
+        self.arrivals.put(0)
         while time <= sim_time:
             e = self.engine.get_next_event()
             time = e.time
@@ -129,6 +142,6 @@ class TrafficSimulation:
 
 
 if __name__ == '__main__':
-    t = TrafficSimulation(2, 1)
+    t = TrafficSimulation(1.5, 1)
     t.run_simulation(10000)
-    print(t.section_data)
+    print(np.mean(t.travel_times))
