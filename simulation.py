@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List
+from random import random
 from queue import Queue
 from event_engine import EventEngine, Event
 
@@ -23,7 +24,7 @@ def get_light_status(section, time) -> float:
 
 def get_red_wait(n_waiting) -> float:
     # TODO: find approximation for wait time as a function of number in front
-    return n_waiting * 2
+    return n_waiting * 8
 
 
 def generate_bimodal(mu: List[float], sigma: List[float], p: float):
@@ -34,10 +35,11 @@ def generate_bimodal(mu: List[float], sigma: List[float], p: float):
     :param p: probability of sampling from the first list
     :return: sample value
     """
-    if np.random.uniform() < p:
-        return np.random.normal(mu[0], sigma[0])
-    else:
-        return np.random.normal(mu[1], sigma[1])
+    # if np.random.uniform() < p:
+    #     return np.random.normal(mu[0], sigma[0])
+    # else:
+    #     return np.random.normal(mu[1], sigma[1])
+    return np.random.normal(mu[0], sigma[0])
 
 
 def get_travel_time(section: int, time: str) -> float:
@@ -64,6 +66,15 @@ def get_travel_time(section: int, time: str) -> float:
         return generate_bimodal(mu_pm[section], sigma_pm[section], p_pm[section])
     else:
         raise ValueError('Time must be AM or PM')
+
+
+def get_interarrival_time(alpha=1.00) -> float:
+    fname = 'interarrival_times/interarrival-{:.2f}-cdf.dat'.format(alpha)
+    cdf = np.genfromtxt(fname, delimiter=',')
+
+    r = random()
+    cdf_row = np.argmax(cdf[:, 1] > r)
+    return cdf[cdf_row, 0]
 
 
 class TrafficEvent(Event):
@@ -99,7 +110,7 @@ class Arrival(TrafficEvent):
 
     def handle(self):
         if self.section == 0:
-            next_arrival_time = np.random.normal(self.base.inter_arrival_mu, self.base.inter_arrival_sigma) + self.time
+            next_arrival_time = get_interarrival_time(alpha=self.base.traffic_alpha) + self.time
             next_arrival = Arrival(self.base, next_arrival_time, self.section)
             self.base.engine.queue_event(next_arrival)
             self.base.arrivals.put(next_arrival_time)
@@ -116,11 +127,12 @@ class Arrival(TrafficEvent):
 
 class TrafficSimulation:
 
-    def __init__(self, inter_arrival_mu, inter_arrival_sigma):
+    def __init__(self, traffic_alpha):
         self.engine = EventEngine()
-        self.inter_arrival_mu = inter_arrival_mu  # all parameters will be in a config file later
-        self.inter_arrival_sigma = inter_arrival_sigma
-        self.am_pm = 'AM'
+        # self.inter_arrival_mu = inter_arrival_mu  # all parameters will be in a config file later
+        # self.inter_arrival_sigma = inter_arrival_sigma
+        self.traffic_alpha = traffic_alpha
+        self.am_pm = 'PM'
 
         self.section_occupancy = [0, 0, 0]
         self.section_queueing = [0, 0, 0, 0]
@@ -138,10 +150,11 @@ class TrafficSimulation:
             time = e.time
             e.handle()
 
-            print(self.section_occupancy, type(e).__name__, time)
+            if type(e).__name__ == 'Departure':
+                print(self.section_occupancy, time)
 
 
 if __name__ == '__main__':
-    t = TrafficSimulation(1.5, 1)
+    t = TrafficSimulation(1.00)
     t.run_simulation(10000)
     print(np.mean(t.travel_times))
