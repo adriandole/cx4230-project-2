@@ -3,6 +3,22 @@ from typing import List
 from event_engine import EventEngine, Event
 
 
+def get_light_status(section, time) -> float:
+    """
+    Evaluates the traffic light cycle for each section
+    :param section: number of section being entered
+    :param time: arrival at traffic light
+    :return: time left to wait at light (0 if green)
+    """
+    section_cycle = [87.6, 100.1, 99.8, 83.9]
+    section_red = [52.9, 58.6, 38.9, 49.3]
+
+    cycle_time = time % section_cycle[section]
+    if cycle_time > section_red[section]:
+        return 0
+    else:
+        return section_red[section] - cycle_time
+
 def generate_bimodal(mu: List[float], sigma: List[float], p: float):
     """
     Sample from a mixture of two normal distribution
