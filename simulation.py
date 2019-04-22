@@ -19,6 +19,12 @@ def get_light_status(section, time) -> float:
     else:
         return section_red[section] - cycle_time
 
+
+def get_red_wait(n_waiting) -> float:
+    # TODO: find approximation for wait time as a function of number in front
+    return n_waiting
+
+
 def generate_bimodal(mu: List[float], sigma: List[float], p: float):
     """
     Sample from a mixture of two normal distribution
@@ -70,8 +76,14 @@ class TrafficEvent(Event):
 class Departure(TrafficEvent):
 
     def handle(self):
+        delay = get_light_status(self.section, self.time)
+        if delay > 0:
+            delay += get_red_wait(self.base.section_queueing[self.section])
+
+        self.base.section_queueing[self.section] += 1
+
         if self.section < 2:
-            next_arrival = Arrival(self.base, self.time, self.section + 1)
+            next_arrival = Arrival(self.base, self.time + delay, self.section + 1)
             self.base.engine.queue_event(next_arrival)
 
         self.base.section_occupancy[self.section] -= 1
@@ -102,6 +114,7 @@ class TrafficSimulation:
         self.inter_arrival_sigma = inter_arrival_sigma
         self.am_pm = 'AM'
         self.section_occupancy = [0, 0, 0]
+        self.section_queueing = [0, 0, 0, 0]
         self.section_data = np.empty((0, 4))
 
     def run_simulation(self, sim_time: int):
