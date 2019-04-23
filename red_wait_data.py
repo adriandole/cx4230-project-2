@@ -21,5 +21,8 @@ plt.plot([1, 5], [c1 + c2, 5*c1 + c2], color='red')
 plt.xlabel('# of cars in front')
 plt.ylabel('Wait time (s)')
 
-print("y = {:2f}n + {:2f}".format(c1[0], c2))
+eqn = "y = {:2f}n + {:2f}".format(c1[0], c2)
+plt.text(3, 19, eqn)
+
+print(eqn)
 plt.show()

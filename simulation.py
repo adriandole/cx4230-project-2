@@ -1,8 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from typing import List
 from random import random
-from queue import Queue
 from event_engine import EventEngine, Event
 
 
@@ -82,10 +80,11 @@ def get_interarrival_time(cdf) -> float:
 
 class TrafficEvent(Event):
 
-    def __init__(self, base, time, section):
+    def __init__(self, base, time, section, entry_time):
         super().__init__(time)
         self.base = base  # reference to the base simulation class, allowing the event to handle itself
         self.section = section
+        self.entry_time = entry_time
 
 
 class Departure(TrafficEvent):
@@ -98,11 +97,10 @@ class Departure(TrafficEvent):
         self.base.section_queueing[self.section] += 1
 
         if self.section < 2:
-            next_arrival = Arrival(self.base, self.time + delay, self.section + 1)
+            next_arrival = Arrival(self.base, self.time + delay, self.section + 1, self.entry_time)
             self.base.engine.queue_event(next_arrival)
         elif self.section == 2:
-            arrival_time = self.base.arrivals.get()
-            self.base.travel_times.append(self.time - arrival_time)
+            self.base.travel_times.append(self.time - self.entry_time)
 
         self.base.section_occupancy[self.section] -= 1
         self.base.section_data = np.append(self.base.section_data,
@@ -115,15 +113,14 @@ class Arrival(TrafficEvent):
         if self.section == 0:
             alpha_idx = int((self.base.traffic_alpha - 0.5) / 0.25)
             next_arrival_time = get_interarrival_time(self.base.alpha_cdf[alpha_idx]) + self.time
-            next_arrival = Arrival(self.base, next_arrival_time, self.section)
+            next_arrival = Arrival(self.base, next_arrival_time, self.section, next_arrival_time)
             self.base.engine.queue_event(next_arrival)
-            self.base.arrivals.put(next_arrival_time)
 
         if self.section >= 1:
             self.base.section_queueing[self.section - 1] -= 1
 
         travel_time = get_travel_time(self.section, self.base.am_pm) + self.time
-        departure = Departure(self.base, travel_time, self.section)
+        departure = Departure(self.base, travel_time, self.section, self.entry_time)
         self.base.engine.queue_event(departure)
 
         self.base.section_occupancy[self.section] += 1
@@ -142,7 +139,6 @@ class TrafficSimulation:
         self.section_queueing = [0, 0, 0, 0]
         self.section_data = np.empty((0, 4))
 
-        self.arrivals = Queue()
         self.travel_times = []
 
         self.alpha_cdf = []
@@ -154,8 +150,7 @@ class TrafficSimulation:
     def run_simulation(self, sim_time: int, print_info=False):
         self.print_info = print_info
         time = 0
-        self.engine.queue_event(Arrival(self, time, 0))
-        self.arrivals.put(0)
+        self.engine.queue_event(Arrival(self, time, 0, 0))
         while time <= sim_time:
             e = self.engine.get_next_event()
             time = e.time
@@ -175,6 +170,6 @@ if __name__ == '__main__':
 
         sim_mean = np.mean(mean_tt)
         sim_stdev = np.std(mean_tt)
-        ci = 2.576 * (sim_stdev / len(mean_tt))
+        ci = 2.6264054563851857 * (sim_stdev / np.sqrt(len(mean_tt)))
 
-        print('Alpha = {}: {} += {}'.format(alpha, sim_mean, ci))
+        print('Alpha = {} | {:7f} += {:5f} | e/s =  {:3f}'.format(alpha, sim_mean, ci, ci*100 / sim_mean))
