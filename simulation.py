@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from typing import List
 from random import random
 from queue import Queue
@@ -73,10 +74,7 @@ def get_travel_time(section: int, time: str) -> float:
         raise ValueError('Time must be AM or PM')
 
 
-def get_interarrival_time(alpha=1.00) -> float:
-    fname = 'interarrival_times/interarrival-{:.2f}-cdf.dat'.format(alpha)
-    cdf = np.genfromtxt(fname, delimiter=',')
-
+def get_interarrival_time(cdf) -> float:
     r = random()
     cdf_row = np.argmax(cdf[:, 1] > r)
     return cdf[cdf_row, 0]
@@ -115,7 +113,8 @@ class Arrival(TrafficEvent):
 
     def handle(self):
         if self.section == 0:
-            next_arrival_time = get_interarrival_time(alpha=self.base.traffic_alpha) + self.time
+            alpha_idx = int((self.base.traffic_alpha - 0.5) / 0.25)
+            next_arrival_time = get_interarrival_time(self.base.alpha_cdf[alpha_idx]) + self.time
             next_arrival = Arrival(self.base, next_arrival_time, self.section)
             self.base.engine.queue_event(next_arrival)
             self.base.arrivals.put(next_arrival_time)
@@ -146,7 +145,14 @@ class TrafficSimulation:
         self.arrivals = Queue()
         self.travel_times = []
 
-    def run_simulation(self, sim_time: int):
+        self.alpha_cdf = []
+        for a in [0.5, 0.75, 1, 1.25, 1.5]:
+            fname = 'interarrival_times/interarrival-{:.2f}-cdf.dat'.format(a)
+            cdf = np.genfromtxt(fname, delimiter=',')
+            self.alpha_cdf.append(cdf)
+
+    def run_simulation(self, sim_time: int, print_info=False):
+        self.print_info = print_info
         time = 0
         self.engine.queue_event(Arrival(self, time, 0))
         self.arrivals.put(0)
@@ -155,11 +161,20 @@ class TrafficSimulation:
             time = e.time
             e.handle()
 
-            if type(e).__name__ == 'Departure':
+            if type(e).__name__ == 'Departure' and print_info:
                 print(self.section_occupancy, time)
 
 
 if __name__ == '__main__':
-    t = TrafficSimulation(1.00)
-    t.run_simulation(10000)
-    print(np.mean(t.travel_times))
+    for alpha in [0.5, 0.75, 1, 1.25, 1.5]:
+        mean_tt = []
+        for k in range(100):
+            t = TrafficSimulation(alpha)
+            t.run_simulation(10000)
+            mean_tt.append(np.mean(t.travel_times))
+
+        sim_mean = np.mean(mean_tt)
+        sim_stdev = np.std(mean_tt)
+        ci = 2.576 * (sim_stdev / len(mean_tt))
+
+        print('Alpha = {}: {} += {}'.format(alpha, sim_mean, ci))
