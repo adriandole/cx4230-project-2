@@ -23,8 +23,13 @@ def get_light_status(section, time) -> float:
 
 
 def get_red_wait(n_waiting) -> float:
-    # TODO: find approximation for wait time as a function of number in front
-    return n_waiting * 8
+    """
+    Additional red light time as a function of number of cars waiting. See red_wait_data.py for how
+    these coefficients were calculated
+    :param n_waiting: number of cars in front
+    :return: additional wait time (s)
+    """
+    return 2.878726 * n_waiting + 3.001445
 
 
 def generate_bimodal(mu: List[float], sigma: List[float], p: float):
