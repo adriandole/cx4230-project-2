@@ -1,4 +1,6 @@
 import numpy as np
+import logging
+import datetime
 from typing import List
 from random import random
 from event_engine import EventEngine, Event
@@ -86,6 +88,8 @@ class TrafficEvent(Event):
         self.section = section
         self.entry_time = entry_time
 
+        logging.debug('{} scheduled at time {}, section {}'.format(type(self).__name__, time, section))
+
 
 class Departure(TrafficEvent):
 
@@ -128,7 +132,7 @@ class Arrival(TrafficEvent):
 
 class TrafficSimulation:
 
-    def __init__(self, traffic_alpha):
+    def __init__(self, traffic_alpha, debug=False):
         self.engine = EventEngine()
         # self.inter_arrival_mu = inter_arrival_mu  # all parameters will be in a config file later
         # self.inter_arrival_sigma = inter_arrival_sigma
@@ -147,12 +151,20 @@ class TrafficSimulation:
             cdf = np.genfromtxt(fname, delimiter=',')
             self.alpha_cdf.append(cdf)
 
-    def run_simulation(self, sim_time: int, print_info=False):
+        if debug:
+            logging.basicConfig(level=logging.DEBUG)
+
+    def run_simulation(self, sim_time: int, print_info=False, queue_initial=True):
         self.print_info = print_info
         time = 0
-        self.engine.queue_event(Arrival(self, time, 0, 0))
+        if queue_initial:
+            self.engine.queue_event(Arrival(self, time, 0, 0))
         while time <= sim_time:
-            e = self.engine.get_next_event()
+            try:
+                e = self.engine.get_next_event()
+            except IndexError:
+                print('No more events: t = {}'.format(time))
+                return
             time = e.time
             e.handle()
 
@@ -164,7 +176,7 @@ if __name__ == '__main__':
     for alpha in [0.5, 0.75, 1, 1.25, 1.5]:
         mean_tt = []
         for k in range(100):
-            t = TrafficSimulation(alpha)
+            t = TrafficSimulation(alpha, debug=False)
             t.run_simulation(10000)
             mean_tt.append(np.mean(t.travel_times))
 
